@@ -32,10 +32,15 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 TOKEN = os.getenv("TOKEN")
 
 # 🔥 你的 Railway Lavalink（免費雲端）
-LAVALINK_HOST = "lavalink-replit-production-aeb7.up.railway.app"
-LAVALINK_PORT = 443
-LAVALINK_PASSWORD = "youshallnotpass"
-LAVALINK_SECURE = True  # Railway 是 HTTPS，所以必須 True
+await wavelink.Pool.connect(
+    client=bot,
+    nodes=[
+        wavelink.Node(
+            uri=f"{'https' if LAVALINK_SECURE else 'http'}://{LAVALINK_HOST}:{LAVALINK_PORT}",
+            password=LAVALINK_PASSWORD
+        )
+    ]
+)
 
 
 # ============================
