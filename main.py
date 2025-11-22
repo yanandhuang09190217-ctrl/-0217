@@ -47,15 +47,16 @@ async def on_ready():
             client=bot,
             nodes=[
                 wavelink.Node(
+                    identifier="RAILWAY",
                     uri=f"{'https' if LAVALINK_SECURE else 'http'}://{LAVALINK_HOST}:{LAVALINK_PORT}",
                     password=LAVALINK_PASSWORD
                 )
             ],
+            cache=False  # 🔥 禁止使用預設 Public Nodes
         )
         print("🎵 Lavalink Connected!")
     except Exception as e:
         print("❌ Lavalink 錯誤：", e)
-
 
 # ============================
 # 播放指令
