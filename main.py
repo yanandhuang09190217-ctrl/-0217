@@ -26,13 +26,17 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# 讀取 Render Variables
+# ============================
+# 讀取 Render 環境變數
+# ============================
 TOKEN = os.getenv("TOKEN")
 
-LAVALINK_HOST = os.getenv("LAVALINK_HOST", "lavalink-replit.fly.dev")
-LAVALINK_PORT = int(os.getenv("LAVALINK_PORT", "443"))
-LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD", "youshallnotpass")
-LAVALINK_SECURE = True  # 你用免費雲端，必定 https
+# 🔥 你的 Railway Lavalink（免費雲端）
+LAVALINK_HOST = "lavalink-replit-production-aeb7.up.railway.app"
+LAVALINK_PORT = 443
+LAVALINK_PASSWORD = "youshallnotpass"
+LAVALINK_SECURE = True  # Railway 是 HTTPS，所以必須 True
+
 
 # ============================
 # Bot Ready：連接 Lavalink
@@ -56,7 +60,7 @@ async def on_ready():
 
 
 # ============================
-# 播放指令（使用 YouTube Relay，不會跳驗證！）
+# 播放指令（使用 ytsearch → 不會遇到登入驗證）
 # ============================
 @bot.command()
 async def play(ctx):
@@ -66,7 +70,7 @@ async def play(ctx):
     channel = ctx.author.voice.channel
     vc: wavelink.Player = ctx.guild.voice_client
 
-    # 如果沒有在語音頻道 → 加入
+    # 如果沒在語音 → 自動加入
     if not vc:
         try:
             vc = await channel.connect(cls=wavelink.Player)
@@ -90,16 +94,16 @@ async def play(ctx):
     except asyncio.TimeoutError:
         return await ctx.send("⏳ 超時取消。")
 
-    # 🎵 使用 Lavalink Relay 模式（不會遇到 YouTube Login）
+    # 🎵 使用 ytsearch（不會跳驗證）
     search_query = f"ytsearch:{query}"
 
     try:
         tracks = await wavelink.Playable.search(search_query)
     except Exception as e:
-        return await ctx.send(f"❌ 搜尋時發生錯誤：{e}")
+        return await ctx.send(f"❌ 搜尋錯誤：{e}")
 
     if not tracks:
-        return await ctx.send("❌ 找不到相關歌曲！")
+        return await ctx.send("❌ 找不到歌曲！")
 
     track = tracks[0]
 
