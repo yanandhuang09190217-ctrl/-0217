@@ -31,10 +31,9 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # ============================
 TOKEN = os.getenv("TOKEN")
 LAVALINK_HOST = os.getenv("LAVALINK_HOST")
-LAVALINK_PORT = os.getenv("LAVALINK_PORT")
+LAVALINK_PORT = int(os.getenv("LAVALINK_PORT", 2333))
 LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD")
-LAVALINK_SECURE = os.getenv("LAVALINK_SECURE", "false").lower() == "true"
-
+LAVALINK_SECURE = os.getenv("LAVALINK_SECURE", "true").lower() == "true"
 # ============================
 # Bot Ready：連接 Lavalink
 # ============================
