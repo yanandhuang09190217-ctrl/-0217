@@ -45,18 +45,19 @@ LAVALINK_SECURE = True  # Railway 是 HTTPS，所以必須 True
 async def on_ready():
     print(f"✅ Logged in as {bot.user}")
 
-    if not wavelink.Pool.nodes:
-        await wavelink.Pool.connect(
-            client=bot,
-            nodes=[
-                wavelink.Node(
-                    uri=f"https://{LAVALINK_HOST}:{LAVALINK_PORT}",
-                    password=LAVALINK_PASSWORD
-                )
-            ],
-        )
+    await wavelink.Pool.connect(
+        client=bot,
+        nodes=[
+            wavelink.Node(
+                uri=f"https://{LAVALINK_HOST}:{LAVALINK_PORT}",
+                password=LAVALINK_PASSWORD,
+                secure=True
+            )
+        ],
+    )
 
     print("🎵 Lavalink Connected!")
+
 
 
 # ============================
