@@ -30,11 +30,10 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # 讀取 Render 環境變數
 # ============================
 TOKEN = os.getenv("TOKEN")
-
 LAVALINK_HOST = os.getenv("LAVALINK_HOST")
-LAVALINK_PORT = int(os.getenv("LAVALINK_PORT", "443"))
+LAVALINK_PORT = os.getenv("LAVALINK_PORT")
 LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD")
-LAVALINK_SECURE = os.getenv("LAVALINK_SECURE", "true").lower() == "true"
+LAVALINK_SECURE = os.getenv("LAVALINK_SECURE", "false").lower() == "true"
 
 # ============================
 # Bot Ready：連接 Lavalink
@@ -43,32 +42,48 @@ LAVALINK_SECURE = os.getenv("LAVALINK_SECURE", "true").lower() == "true"
 async def on_ready():
     print(f"✅ Logged in as {bot.user}")
 
-    # 避免重複初始化
-    if wavelink.Pool.is_connected():
-        print("⚠️ Lavalink 已經連接，跳過初始化！")
-        return
+    node_uri = f"{'https' if LAVALINK_SECURE else 'http'}://{LAVALINK_HOST}:{LAVALINK_PORT}"
+    print(f"🌐 Connecting to Lavalink → {node_uri}")
 
-    try:
-        await wavelink.Pool.connect(
-            client=bot,
-            nodes=[
-                wavelink.Node(
-                    identifier="RAILWAY",
-                    uri=f"{'https' if LAVALINK_SECURE else 'http'}://{LAVALINK_HOST}:{LAVALINK_PORT}",
-                    password=LAVALINK_PASSWORD
-                )
-            ],
-            cache=False  # 🔥 不使用 public nodes，只使用你的 Railway node
-        )
-        print("🎵 Lavalink Connected!")
-    except Exception as e:
-        print("❌ Lavalink 錯誤：", e)
+    # 自動重試
+    for i in range(5):
+        try:
+            await wavelink.Pool.connect(
+                client=bot,
+                nodes=[
+                    wavelink.Node(
+                        identifier="MY_NODE",
+                        uri=node_uri,
+                        password=LAVALINK_PASSWORD
+                    )
+                ],
+                cache=False
+            )
+
+            # 👉 確保節點已成功連線
+            node = wavelink.Pool.get_node()
+            if node and node.status == wavelink.NodeStatus.CONNECTED:
+                print("🎵 Lavalink Connected!")
+                return
+            
+            raise Exception("Node not in CONNECTED state.")
+
+        except Exception as e:
+            print(f"❌ 第 {i+1}/5 次連接失敗：{e}")
+            await asyncio.sleep(3)
+
+    print("🚨 無法連線到 Lavalink，請檢查 HOST / PORT / 密碼 / https 設定是否正確！")
 
 # ============================
 # 播放指令
 # ============================
 @bot.command()
 async def play(ctx):
+    # 檢查節點是否在線
+    node = wavelink.Pool.get_node()
+    if not node or node.status != wavelink.NodeStatus.CONNECTED:
+        return await ctx.send("❌｜Lavalink 尚未連線（請稍後再試）")
+
     if not ctx.author.voice:
         return await ctx.reply("⚠️ 你必須先加入語音頻道！")
 
@@ -130,7 +145,7 @@ async def leave(ctx):
 
 
 # ============================
-# 啟動 Bot
+# 啟動 Bot（asyncio.run）
 # ============================
 async def main():
     Thread(target=run_web).start()
