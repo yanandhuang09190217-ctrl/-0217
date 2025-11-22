@@ -30,10 +30,11 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # 讀取 Render 環境變數
 # ============================
 TOKEN = os.getenv("TOKEN")
+
 LAVALINK_HOST = os.getenv("LAVALINK_HOST")
-LAVALINK_PORT = os.getenv("LAVALINK_PORT")
+LAVALINK_PORT = int(os.getenv("LAVALINK_PORT", "443"))
 LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD")
-LAVALINK_SECURE = os.getenv("LAVALINK_SECURE", "false").lower() == "true"
+LAVALINK_SECURE = os.getenv("LAVALINK_SECURE", "true").lower() == "true"
 
 # ============================
 # Bot Ready：連接 Lavalink
@@ -41,6 +42,11 @@ LAVALINK_SECURE = os.getenv("LAVALINK_SECURE", "false").lower() == "true"
 @bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user}")
+
+    # 避免重複初始化
+    if wavelink.Pool.is_connected():
+        print("⚠️ Lavalink 已經連接，跳過初始化！")
+        return
 
     try:
         await wavelink.Pool.connect(
@@ -52,7 +58,7 @@ async def on_ready():
                     password=LAVALINK_PASSWORD
                 )
             ],
-            cache=False  # 🔥 禁止使用預設 Public Nodes
+            cache=False  # 🔥 不使用 public nodes，只使用你的 Railway node
         )
         print("🎵 Lavalink Connected!")
     except Exception as e:
@@ -124,7 +130,7 @@ async def leave(ctx):
 
 
 # ============================
-# 啟動 Bot（asyncio.run）
+# 啟動 Bot
 # ============================
 async def main():
     Thread(target=run_web).start()
