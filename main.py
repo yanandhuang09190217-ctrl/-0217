@@ -50,20 +50,19 @@ await wavelink.Pool.connect(
 async def on_ready():
     print(f"✅ Logged in as {bot.user}")
 
-    await wavelink.Pool.connect(
-        client=bot,
-        nodes=[
-            wavelink.Node(
-                uri=f"https://{LAVALINK_HOST}:{LAVALINK_PORT}",
-                password=LAVALINK_PASSWORD,
-                secure=True
-            )
-        ],
-    )
-
-    print("🎵 Lavalink Connected!")
-
-
+    try:
+        await wavelink.Pool.connect(
+            client=bot,
+            nodes=[
+                wavelink.Node(
+                    uri=f"https://{LAVALINK_HOST}:{LAVALINK_PORT}",
+                    password=LAVALINK_PASSWORD
+                )
+            ],
+        )
+        print("🎵 Lavalink Connected!")
+    except Exception as e:
+        print("❌ Lavalink 錯誤：", e)
 
 # ============================
 # 播放指令（使用 ytsearch → 不會遇到登入驗證）
