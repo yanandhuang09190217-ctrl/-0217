@@ -30,18 +30,10 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # 讀取 Render 環境變數
 # ============================
 TOKEN = os.getenv("TOKEN")
-
-# 🔥 你的 Railway Lavalink（免費雲端）
-await wavelink.Pool.connect(
-    client=bot,
-    nodes=[
-        wavelink.Node(
-            uri=f"{'https' if LAVALINK_SECURE else 'http'}://{LAVALINK_HOST}:{LAVALINK_PORT}",
-            password=LAVALINK_PASSWORD
-        )
-    ]
-)
-
+LAVALINK_HOST = os.getenv("LAVALINK_HOST")
+LAVALINK_PORT = os.getenv("LAVALINK_PORT")
+LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD")
+LAVALINK_SECURE = os.getenv("LAVALINK_SECURE", "false").lower() == "true"
 
 # ============================
 # Bot Ready：連接 Lavalink
@@ -55,7 +47,7 @@ async def on_ready():
             client=bot,
             nodes=[
                 wavelink.Node(
-                    uri=f"https://{LAVALINK_HOST}:{LAVALINK_PORT}",
+                    uri=f"{'https' if LAVALINK_SECURE else 'http'}://{LAVALINK_HOST}:{LAVALINK_PORT}",
                     password=LAVALINK_PASSWORD
                 )
             ],
@@ -64,8 +56,9 @@ async def on_ready():
     except Exception as e:
         print("❌ Lavalink 錯誤：", e)
 
+
 # ============================
-# 播放指令（使用 ytsearch → 不會遇到登入驗證）
+# 播放指令
 # ============================
 @bot.command()
 async def play(ctx):
@@ -75,7 +68,6 @@ async def play(ctx):
     channel = ctx.author.voice.channel
     vc: wavelink.Player = ctx.guild.voice_client
 
-    # 如果沒在語音 → 自動加入
     if not vc:
         try:
             vc = await channel.connect(cls=wavelink.Player)
@@ -99,7 +91,6 @@ async def play(ctx):
     except asyncio.TimeoutError:
         return await ctx.send("⏳ 超時取消。")
 
-    # 🎵 使用 ytsearch（不會跳驗證）
     search_query = f"ytsearch:{query}"
 
     try:
@@ -132,8 +123,12 @@ async def leave(ctx):
 
 
 # ============================
-# 啟動
+# 啟動 Bot（asyncio.run）
 # ============================
-if __name__ == "__main__":
+async def main():
     Thread(target=run_web).start()
-    bot.run(TOKEN)
+    async with bot:
+        await bot.start(TOKEN)
+
+if __name__ == "__main__":
+    asyncio.run(main())
