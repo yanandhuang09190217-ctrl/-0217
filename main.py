@@ -1,103 +1,103 @@
+import os
+import asyncio
 import discord
 from discord.ext import commands
 import wavelink
-import os
-import asyncio
 
-# =============================
-# 讀取環境變數
-# =============================
+# ========== 1️⃣ Fake Web Server（讓 Render 偵測到 PORT） ==========
+from flask import Flask
+from threading import Thread
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Bot is running!"
+
+def run_web():
+    port = int(os.getenv("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
+
+# 啟動 Fake Web Server
+Thread(target=run_web).start()
+
+# ========== 2️⃣ Discord Bot 基本設定 ==========
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
 LAVALINK_HOST = os.getenv("LAVALINK_HOST")
-LAVALINK_PORT = int(os.getenv("LAVALINK_PORT", "2333"))
+LAVALINK_PORT = int(os.getenv("LAVALINK_PORT"))
 LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD")
 LAVALINK_SECURE = os.getenv("LAVALINK_SECURE", "false").lower() == "true"
 
-# ---- Debug print ----
-print("========== Lavalink Config ==========")
-print("TOKEN:", "OK" if TOKEN else "❌ None")
+print("===== Lavalink Config =====")
 print("HOST:", LAVALINK_HOST)
 print("PORT:", LAVALINK_PORT)
-print("PASSWORD:", LAVALINK_PASSWORD)
+print("PASS:", LAVALINK_PASSWORD)
 print("SECURE:", LAVALINK_SECURE)
-print("=====================================")
+print("===========================")
 
-if TOKEN is None:
-    print("❌ 錯誤：你的 DISCORD_BOT_TOKEN 沒有設定！")
-    print("請到 Render → Environment → 新增： DISCORD_BOT_TOKEN = <你的BotToken>")
-    raise SystemExit
-
-
-# =============================
-# Discord Bot
-# =============================
 intents = discord.Intents.default()
 intents.message_content = True
+
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 
-# =============================
-# Bot 啟動事件
-# =============================
+# ========== 3️⃣ Bot Ready → 連接 Lavalink ==========
 @bot.event
 async def on_ready():
     print(f"Bot 已啟動：{bot.user}")
 
     await asyncio.sleep(1)
 
-    print("正在連線到 Lavalink 伺服器…")
-
-    node = wavelink.Node(
-        uri=f"http{'s' if LAVALINK_SECURE else ''}://{LAVALINK_HOST}:{LAVALINK_PORT}",
-        password=LAVALINK_PASSWORD,
-        secure=LAVALINK_SECURE
-    )
+    url = f"http{'s' if LAVALINK_SECURE else ''}://{LAVALINK_HOST}:{LAVALINK_PORT}"
+    print(f"Connecting Lavalink → {url}")
 
     try:
-        await wavelink.Pool.connect(nodes=[node], client=bot)
-        print("✔️ 成功連線到 Lavalink！")
+        await wavelink.Pool.connect(
+            nodes=[
+                wavelink.Node(
+                    uri=url,
+                    password=LAVALINK_PASSWORD,
+                    secure=LAVALINK_SECURE
+                )
+            ],
+            client=bot
+        )
+        print("✔️ Lavalink 連接成功！")
     except Exception as e:
-        print("❌ 無法連線到 Lavalink：", e)
+        print("❌ Lavalink 連線失敗：", e)
 
 
-# =============================
-# 指令
-# =============================
+# ========== 4️⃣ 音樂指令 ==========
 @bot.command()
 async def join(ctx):
-    if not ctx.author.voice:
+    if ctx.author.voice is None:
         return await ctx.reply("你需要在語音頻道內。")
 
     channel = ctx.author.voice.channel
     await channel.connect(cls=wavelink.Player)
     await ctx.reply(f"已加入：{channel}")
 
-
 @bot.command()
 async def play(ctx, *, search: str):
     if ctx.voice_client is None:
-        return await ctx.reply("Bot 尚未加入語音頻道，用 `!join`")
+        return await ctx.reply("Bot 尚未加入語音頻道，請先使用 `!join`")
 
-    results = await wavelink.Playable.search(search)
-    if not results:
+    query = await wavelink.Playable.search(search)
+    if not query:
         return await ctx.reply("找不到歌曲。")
 
-    track = results[0]
+    track = query[0]
     await ctx.voice_client.play(track)
-    await ctx.reply(f"🎵 播放：**{track.title}**")
-
+    await ctx.reply(f"🎵 正在播放：**{track.title}**")
 
 @bot.command()
 async def stop(ctx):
     if ctx.voice_client:
         await ctx.voice_client.disconnect()
-        await ctx.reply("已離開語音頻道。")
-    else:
-        await ctx.reply("我沒有在語音頻道。")
+        return await ctx.reply("已離開語音頻道。")
+    await ctx.reply("Bot 不在語音頻道。")
 
 
-# =============================
-# 啟動 BOT
-# =============================
+# ========== 5️⃣ 啟動 Bot ==========
 bot.run(TOKEN)
