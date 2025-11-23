@@ -1,149 +1,96 @@
-import os
-import asyncio
 import discord
 from discord.ext import commands
 import wavelink
-from flask import Flask
-from threading import Thread
+import os
+import asyncio
 
-# ============================
-# Flask 保持 Render Web Service 醒著
-# ============================
-app = Flask(__name__)
+TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
-@app.route("/")
-def home():
-    return "Music Bot is running!"
+LAVALINK_HOST = os.getenv("LAVALINK_HOST")
+LAVALINK_PORT = int(os.getenv("LAVALINK_PORT"))
+LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD")
+LAVALINK_SECURE = os.getenv("LAVALINK_SECURE", "false").lower() == "true"
 
-def run_web():
-    port = int(os.getenv("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
 
-# ============================
-# Discord Bot 設定
-# ============================
+# ---- Debug print ----
+print("========== Lavalink Config ==========")
+print("HOST:", LAVALINK_HOST)
+print("PORT:", LAVALINK_PORT)
+print("PASSWORD:", LAVALINK_PASSWORD)
+print("SECURE:", LAVALINK_SECURE)
+print("=====================================")
+
+
 intents = discord.Intents.default()
 intents.message_content = True
+
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# ============================
-# 讀取 Render 環境變數
-# ============================
-TOKEN = os.getenv("TOKEN")
 
-LAVALINK_HOST = os.getenv("LAVALINK_HOST")        # ex: your-lavalink.onrender.com
-LAVALINK_PORT = os.getenv("LAVALINK_PORT", "443") # Render 通常是 443
-LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD")
-LAVALINK_SECURE = os.getenv("LAVALINK_SECURE", "true").lower() == "true"
-
-# ============================
-# Bot Ready：連接 Lavalink
-# ============================
-@bot.event
+# ------------------------------------------
+#   Lavalink 啟動
+# ------------------------------------------
 @bot.event
 async def on_ready():
-    print(f"✅ Logged in as {bot.user}")
+    print(f"Bot 已啟動：{bot.user}")
 
-    print("🔍 Checking Lavalink settings...")
-    print("HOST =", LAVALINK_HOST)
-    print("PORT =", LAVALINK_PORT)
-    print("PASSWORD =", LAVALINK_PASSWORD)
-    print("SECURE =", LAVALINK_SECURE)
+    # 等待 Discord 連線穩定
+    await asyncio.sleep(1)
 
-    url = f"{'https' if LAVALINK_SECURE else 'http'}://{LAVALINK_HOST}:{LAVALINK_PORT}"
-    print(f"🌐 Connecting Lavalink: {url}")
+    # 啟動 Node
+    print("正在連線到 Lavalink 伺服器…")
+
+    node = wavelink.Node(
+        uri=f"http{'s' if LAVALINK_SECURE else ''}://{LAVALINK_HOST}:{LAVALINK_PORT}",
+        password=LAVALINK_PASSWORD,
+        secure=LAVALINK_SECURE
+    )
 
     try:
-        await wavelink.Pool.connect(
-            client=bot,
-            nodes=[
-                wavelink.Node(
-                    identifier="RENDER",
-                    uri=url,
-                    password=LAVALINK_PASSWORD,
-                )
-            ],
-            cache=False
-        )
-        print("🎵 Lavalink Connected Successfully!")
+        await wavelink.Pool.connect(nodes=[node], client=bot)
+        print("✔️ 已成功連線到 Lavalink！")
     except Exception as e:
-        print("❌ Lavalink 錯誤：", e)
+        print("❌ 無法連線到 Lavalink：", e)
 
-# ============================
-# 播放指令
-# ============================
+
+# ------------------------------------------
+#   音樂指令
+# ------------------------------------------
 @bot.command()
-async def play(ctx):
-    if not ctx.author.voice:
-        return await ctx.reply("⚠️ 你必須先加入語音頻道！")
+async def join(ctx):
+    if ctx.author.voice is None:
+        return await ctx.reply("你需要在語音頻道內。")
 
-    # 取得語音頻道
     channel = ctx.author.voice.channel
-    vc: wavelink.Player = ctx.guild.voice_client
+    await channel.connect(cls=wavelink.Player)
+    await ctx.reply(f"已加入：{channel}")
 
-    # 檢查 Lavalink 是否連接成功
-    if not wavelink.Pool.nodes:
-        return await ctx.send("❌｜Lavalink 尚未連線，無法播放。")
 
-    if not vc:
-        try:
-            vc = await channel.connect(cls=wavelink.Player)
-            await ctx.send("🔊 已加入語音頻道！")
-        except Exception as e:
-            return await ctx.send(f"❌｜無法加入語音：{e}")
-
-    ask = await ctx.send("🎵 請輸入歌曲名稱或 YouTube 連結（60 秒內）")
-
-    def check(msg):
-        return msg.author == ctx.author and msg.channel == ctx.channel
-
-    try:
-        msg = await bot.wait_for("message", check=check, timeout=60)
-        query = msg.content
-        await ask.delete()
-        try:
-            await msg.delete()
-        except:
-            pass
-    except asyncio.TimeoutError:
-        return await ctx.send("⏳ 超時取消。")
-
-    search_query = f"ytsearch:{query}"
-
-    try:
-        tracks = await wavelink.Playable.search(search_query)
-    except Exception as e:
-        return await ctx.send(f"❌ 搜尋錯誤：{e}")
-
-    if not tracks:
-        return await ctx.send("❌ 找不到歌曲！")
-
-    track = tracks[0]
-
-    try:
-        await vc.play(track)
-    except Exception as e:
-        return await ctx.send(f"❌ 播放失敗：{e}")
-
-    await ctx.send(f"▶ 正在播放：**{track.title}**")
-
-# ============================
-# 離開
-# ============================
 @bot.command()
-async def leave(ctx):
+async def play(ctx, *, search: str):
+    if ctx.voice_client is None:
+        await ctx.reply("Bot 尚未加入語音頻道，請先用 `!join`")
+        return
+
+    query = await wavelink.Playable.search(search)
+    if not query:
+        return await ctx.reply("找不到結果。")
+
+    track = query[0]
+    await ctx.voice_client.play(track)
+    await ctx.reply(f"🎵 正在播放：**{track.title}**")
+
+
+@bot.command()
+async def stop(ctx):
     if ctx.voice_client:
         await ctx.voice_client.disconnect()
-        return await ctx.send("👋 已離開語音頻道")
-    await ctx.send("⚠️ 我本來就不在語音頻道喔")
+        await ctx.reply("已離開語音頻道。")
+    else:
+        await ctx.reply("Bot 不在語音頻道。")
 
-# ============================
-# 啟動 Bot
-# ============================
-async def main():
-    Thread(target=run_web).start()
-    async with bot:
-        await bot.start(TOKEN)
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# ------------------------------------------
+#   啟動 Bot
+# ------------------------------------------
+bot.run(TOKEN)
