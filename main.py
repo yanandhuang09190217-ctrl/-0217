@@ -93,4 +93,6 @@ async def stop(ctx):
 # ------------------------------------------
 #   啟動 Bot
 # ------------------------------------------
-bot.run(TOKEN)
+import os
+
+TOKEN = os.getenv("DISCORD_BOT_TOKEN")
