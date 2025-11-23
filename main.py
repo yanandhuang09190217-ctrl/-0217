@@ -40,8 +40,15 @@ LAVALINK_SECURE = os.getenv("LAVALINK_SECURE", "true").lower() == "true"
 # Bot Ready：連接 Lavalink
 # ============================
 @bot.event
+@bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user}")
+
+    print("🔍 Checking Lavalink settings...")
+    print("HOST =", LAVALINK_HOST)
+    print("PORT =", LAVALINK_PORT)
+    print("PASSWORD =", LAVALINK_PASSWORD)
+    print("SECURE =", LAVALINK_SECURE)
 
     url = f"{'https' if LAVALINK_SECURE else 'http'}://{LAVALINK_HOST}:{LAVALINK_PORT}"
     print(f"🌐 Connecting Lavalink: {url}")
@@ -58,7 +65,7 @@ async def on_ready():
             ],
             cache=False
         )
-        print("🎵 Lavalink Connected!")
+        print("🎵 Lavalink Connected Successfully!")
     except Exception as e:
         print("❌ Lavalink 錯誤：", e)
 
